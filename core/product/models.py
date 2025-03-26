@@ -89,6 +89,7 @@ class Product(models.Model):
         seller_name = self.seller.first_name if self.seller else "Unknown"
         return f"{self.title} - {self.price} {self.currency} (Seller: {seller_name})"
 
+# models.py
 class Favorite(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='favorited_by')
@@ -99,4 +100,3 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f"{self.user.email} favorited {self.product.title}"
-
