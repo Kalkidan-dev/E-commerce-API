@@ -143,6 +143,7 @@ class ProductSerializer(serializers.ModelSerializer):
         }
 
 
+# serializers.py
 class FavoriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Favorite
@@ -151,13 +152,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context['request'].user
-        product_id = validated_data.get('product_id')  # Use 'product_id' instead of 'product'
-
-        # Ensure product exists
-        try:
-            product = Product.objects.get(id=product_id)
-        except Product.DoesNotExist:
-            raise serializers.ValidationError("Product does not exist.")
+        product = validated_data['product']  # Now using 'product', not 'product_id'
 
         # Check for duplicate favorites
         if Favorite.objects.filter(user=user, product=product).exists():
