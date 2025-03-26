@@ -9,6 +9,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from ..user.permissions import IsAdminOrOwner
+import logging
 from rest_framework import filters
 import django_filters
 from rest_framework.permissions import AllowAny, IsAdminUser
@@ -109,38 +110,55 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Response({"detail": f"{deleted_count} categories deleted successfully."}, status=status.HTTP_200_OK)
 
 
+from django.shortcuts import get_object_or_404
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import Favorite, Product
+from .serializers import FavoriteSerializer
+
 class FavoriteViewSet(viewsets.ModelViewSet):
     serializer_class = FavoriteSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Favorite.objects.filter(user=self.request.user)  #Only return user’s favorites
+        """Only return the authenticated user's favorites"""
+        return Favorite.objects.filter(user=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        product_id = request.data.get('product_id')  # Make sure the key matches
+        """Add a product to favorites"""
+        product_id = request.data.get("product_id")
 
         if not product_id:
             return Response({"error": "Product ID is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Prevent duplicate favorites
-        if Favorite.objects.filter(user=request.user, product_id=product_id).exists():
+        # Get the product instance
+        product = get_object_or_404(Product, id=product_id)
+
+        # Check if already favorited
+        if Favorite.objects.filter(user=request.user, product=product).exists():
             return Response({"error": "Product already favorited"}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = self.get_serializer(data={"user": request.user.id, "product": product_id})
-        serializer.is_valid(raise_exception=True)
-        favorite = serializer.save()
+        # Create the favorite
+        favorite = Favorite.objects.create(user=request.user, product=product)
         return Response(FavoriteSerializer(favorite).data, status=status.HTTP_201_CREATED)
-    
 
-    @action(detail=True, methods=['DELETE'])
-    def remove(self, request, pk=None):
-        """Custom endpoint to remove a product from favorites"""
-        try:
-            favorite = Favorite.objects.get(user=request.user, product_id=pk)
-            favorite.delete()
-            return Response({"message": "Removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
-        except Favorite.DoesNotExist:
+    @action(detail=False, methods=['DELETE'])
+    def remove(self, request):
+        """Remove a product from favorites"""
+        product_id = request.data.get("product_id")
+
+        if not product_id:
+            return Response({"error": "Product ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get the favorite instance
+        favorite = Favorite.objects.filter(user=request.user, product_id=product_id).first()
+
+        if not favorite:
             return Response({"error": "Product not in favorites"}, status=status.HTTP_400_BAD_REQUEST)
+
+        favorite.delete()
+        return Response({"message": "Removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
 
 
 class IsOwner(permissions.BasePermission):
